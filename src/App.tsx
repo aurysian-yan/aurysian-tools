@@ -414,7 +414,7 @@ function ScaleControlRow({
   const isDisabled = !imageMetrics;
 
   return (
-    <HStack gap={3} align="stretch">
+    <HStack gap={3} align="center">
       <Button
         variant="outline"
         size="lg"
