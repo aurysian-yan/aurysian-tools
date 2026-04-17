@@ -133,6 +133,7 @@ const DIALOG_VIEWPORT_MARGIN = '24px';
 const FLOATING_BAR_BLUR_HEIGHT = 108;
 const BACKGROUND_VEIL_SCROLL_DISTANCE = 420;
 const CONTENT_CARD_PADDING = { base: 5, md: 6 } as const;
+const GITHUB_REPO_URL = 'https://github.com/aurysian-yan/aurysian-tools';
 const checkerboardLight = `
   linear-gradient(45deg, rgba(223, 228, 232, 0.88) 25%, transparent 25%),
   linear-gradient(-45deg, rgba(223, 228, 232, 0.88) 25%, transparent 25%),
@@ -1151,6 +1152,40 @@ function App({ appearance }: AppProps) {
                 </Card.Root>
               </Stack>
             </Grid>
+
+            <Card.Root
+              {...surfaceCardProps}
+              borderRadius="panel"
+            >
+              <Card.Body p={CONTENT_CARD_PADDING}>
+                <Stack gap={4}>
+                  <Stack gap={2}>
+                    <Heading as="h2" size="sm">
+                      隐私说明
+                    </Heading>
+                    <Text color="fg.muted">
+                      当前版本会在浏览器本地读取、预览并导出你选择的图片，不会把图片上传到项目服务器或第三方图片处理服务。
+                    </Text>
+                    <Text fontSize="sm" color="fg.muted">
+                      页面本身仍需要从当前部署站点加载前端代码与静态资源；如果你想自行核对实现，可以直接查看开源仓库。
+                    </Text>
+                  </Stack>
+
+                  <Flex justify="flex-start">
+                    <Button
+                      as="a"
+                      href={GITHUB_REPO_URL}
+                      target="_blank"
+                      rel="noreferrer"
+                      variant="outline"
+                      borderRadius="full"
+                    >
+                      查看 GitHub 仓库
+                    </Button>
+                  </Flex>
+                </Stack>
+              </Card.Body>
+            </Card.Root>
 
             <Flex justify="center" pt={{ base: 4, md: 6 }}>
               <Box
