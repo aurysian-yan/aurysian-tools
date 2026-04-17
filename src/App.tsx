@@ -20,7 +20,7 @@ import {
   Text,
   Theme,
 } from '@chakra-ui/react';
-import { Minus, Plus } from 'phosphor-react';
+import { Minus, Plus, X } from 'phosphor-react';
 import {
   ChangeEvent,
   type CSSProperties,
@@ -119,6 +119,7 @@ type PreviewActionRowProps = {
   imageMetrics: ImageMetrics | null;
   previewOverlaySrc: string | null;
   showFrameOverlay: boolean;
+  showFineTuneButton: boolean;
   onOpenFineTune: () => void;
   onToggleOverlay: () => void;
 };
@@ -455,20 +456,23 @@ function PreviewActionRow({
   imageMetrics,
   previewOverlaySrc,
   showFrameOverlay,
+  showFineTuneButton,
   onOpenFineTune,
   onToggleOverlay,
 }: PreviewActionRowProps) {
   return (
-    <Grid templateColumns="repeat(2, minmax(0, 1fr))" gap={3}>
-      <Button
-        size="lg"
-        colorPalette="gray"
-        variant="subtle"
-        onClick={onOpenFineTune}
-        disabled={!imageMetrics}
-      >
-        放大微调
-      </Button>
+    <Grid templateColumns={showFineTuneButton ? 'repeat(2, minmax(0, 1fr))' : '1fr'} gap={3}>
+      {showFineTuneButton ? (
+        <Button
+          size="lg"
+          colorPalette="gray"
+          variant="subtle"
+          onClick={onOpenFineTune}
+          disabled={!imageMetrics}
+        >
+          放大微调
+        </Button>
+      ) : null}
       <Button
         size="lg"
         variant={showFrameOverlay ? 'solid' : 'outline'}
@@ -520,6 +524,7 @@ function App({ appearance }: AppProps) {
   const [dragging, setDragging] = useState(false);
   const [exportUrl, setExportUrl] = useState<string | null>(null);
   const [isFineTuneOpen, setIsFineTuneOpen] = useState(false);
+  const [isDesktopLayout, setIsDesktopLayout] = useState(false);
   const [showFrameOverlay, setShowFrameOverlay] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
 
@@ -574,6 +579,26 @@ function App({ appearance }: AppProps) {
     window.addEventListener('scroll', updateScrollProgress, { passive: true });
 
     return () => window.removeEventListener('scroll', updateScrollProgress);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const media = window.matchMedia('(min-width: 80rem)');
+    const updateDesktopLayout = (event?: MediaQueryListEvent) => {
+      const matches = event?.matches ?? media.matches;
+      setIsDesktopLayout(matches);
+      if (matches) {
+        setIsFineTuneOpen(false);
+      }
+    };
+
+    updateDesktopLayout();
+    media.addEventListener('change', updateDesktopLayout);
+
+    return () => media.removeEventListener('change', updateDesktopLayout);
   }, []);
 
   const frameBoxStyle = useMemo(
@@ -928,7 +953,7 @@ function App({ appearance }: AppProps) {
                           壁纸预览
                         </Heading>
                         <Text color="fg.muted">
-                          微调图片位置并预览效果，双击图片以放大
+                          {isDesktopLayout ? '微调图片位置并预览效果' : '微调图片位置并预览效果，双击图片以放大'}
                         </Text>
                       </Stack>
                       <HStack gap={2} wrap="wrap">
@@ -961,7 +986,7 @@ function App({ appearance }: AppProps) {
                       onPointerDown={handlePointerDown}
                       onPointerMove={handlePointerMove}
                       onPointerUp={handlePointerUp}
-                      onDoubleClick={imageMetrics ? () => setIsFineTuneOpen(true) : undefined}
+                      onDoubleClick={imageMetrics && !isDesktopLayout ? () => setIsFineTuneOpen(true) : undefined}
                       placeholderTitle="请先导入图片"
                       maxWidth={`min(100%, ${PREVIEW_CANVAS_MAX_WIDTH}px, calc(${PREVIEW_CANVAS_MAX_VIEWPORT_HEIGHT} * ${canvasAspectRatio}))`}
                     />
@@ -1011,6 +1036,7 @@ function App({ appearance }: AppProps) {
                             imageMetrics={imageMetrics}
                             previewOverlaySrc={previewOverlaySrc}
                             showFrameOverlay={showFrameOverlay}
+                            showFineTuneButton={!isDesktopLayout}
                             onOpenFineTune={() => setIsFineTuneOpen(true)}
                             onToggleOverlay={() => setShowFrameOverlay((current) => !current)}
                           />
@@ -1111,6 +1137,7 @@ function App({ appearance }: AppProps) {
                         imageMetrics={imageMetrics}
                         previewOverlaySrc={previewOverlaySrc}
                         showFrameOverlay={showFrameOverlay}
+                        showFineTuneButton={!isDesktopLayout}
                         onOpenFineTune={() => setIsFineTuneOpen(true)}
                         onToggleOverlay={() => setShowFrameOverlay((current) => !current)}
                       />
@@ -1208,140 +1235,162 @@ function App({ appearance }: AppProps) {
         </Card.Root>
       </Box>
 
-      <Dialog.Root open={isFineTuneOpen} onOpenChange={(details) => setIsFineTuneOpen(details.open)}>
+      <Dialog.Root open={!isDesktopLayout && isFineTuneOpen} onOpenChange={(details) => setIsFineTuneOpen(details.open)}>
         <Portal>
           <Theme appearance={appearance} hasBackground={false}>
             <Dialog.Backdrop bg="blackAlpha.700" backdropFilter="blur(6px)" />
             <Dialog.Positioner p={{ base: 3, md: 6 }} overflow="hidden">
-              <Dialog.Content
+              <Stack
                 w="min(96vw, 1400px)"
                 maxW="96vw"
-                h={`calc(${STABLE_VIEWPORT_HEIGHT} - var(--dialog-base-margin) - 24px)`}
-                maxH={`calc(${STABLE_VIEWPORT_HEIGHT} - var(--dialog-base-margin) - 24px)`}
-                borderRadius={"32px"}
-                bg="bg.panel"
-                overflow="hidden"
-                display="flex"
-                flexDirection="column"
+                h={`calc(${STABLE_VIEWPORT_HEIGHT} - ${DIALOG_VIEWPORT_MARGIN})`}
+                maxH={`calc(${STABLE_VIEWPORT_HEIGHT} - ${DIALOG_VIEWPORT_MARGIN})`}
+                gap={{ base: 3, md: 4 }}
+                align="stretch"
+                margin={"0"}
               >
-                <Box position={"fixed"} top={"34px"} left={"24px"}>
-                  <Dialog.Title fontSize={{ base: 'lg', md: 'xl' }} m="0" color={"white"}>
+                <Flex
+                  align="center"
+                  justify="space-between"
+                  color="white"
+                  px={{ base: 2, md: 2 }}
+                  py={{ base: 1, md: 1 }}
+                  flexShrink={0}
+                >
+                  <Dialog.Title
+                    fontSize={{ base: '2xl', md: '4xl' }}
+                    fontWeight="800"
+                    letterSpacing="-0.04em"
+                    m="0"
+                    p="0 4px"
+                  >
                     放大微调
                   </Dialog.Title>
-                </Box>
-                <Dialog.Header px={{ base: 4, md: 6 }} pt={{ base: 4, md: 6 }} pb={3} flexShrink={0} position={"fixed"} zIndex={"10"} right={"12px"}>
-                  <Card.Root
-                    borderRadius="full"
-                    bg="panelFloat"
-                    borderColor="border"
-                    backdropFilter="blur(18px)"
-                    boxShadow="floating"
-                    w="full"
+                  <Button
+                    aria-label="关闭放大微调"
+                    variant="ghost"
+                    color="white"
+                    minW={{ base: '40px', md: '40px' }}
+                    w={{ base: '40px', md: '40px' }}
+                    h={{ base: '40px', md: '40px' }}
+                    p="0"
+                    borderRadius="10px"
+                    bg={{ base: 'transparent', md: 'transparent' }}
+                    _hover={{ bg: 'whiteAlpha.100' }}
+                    _active={{ bg: 'whiteAlpha.200' }}
+                    onClick={() => setIsFineTuneOpen(false)}
                   >
-                    <Card.Body p="4px">
-                      <Flex justify="space-between" align="center" gap={3} w="full">
-                        <CloseButton onClick={() => setIsFineTuneOpen(false)} />
-                      </Flex>
-                    </Card.Body>
-                  </Card.Root>
-                </Dialog.Header>
+                    <X size={28} weight="bold" aria-hidden="true" />
+                  </Button>
+                </Flex>
 
-                <Dialog.Body
-                  py={"0"}
-                  px={{ base: 4, md: 6 }}
+                <Dialog.Content
+                  w="full"
                   flex="1"
                   minH="0"
+                  borderRadius="32px"
+                  bg="bg.panel"
+                  overflow="hidden"
                   display="flex"
                   flexDirection="column"
-                  gap={4}
-                  overflow="hidden"
+                  margin={"0"}
                 >
-                  <Box
+                  <Dialog.Body
+                    px={{ base: 0, md: 6 }}
+                    py={{ base: 0, md: 5 }}
                     flex="1"
                     minH="0"
-                    minW="0"
-                    overflow="auto"
-                    overscrollBehavior="contain"
-                    pb="172px"
-                    pt="72px"
+                    display="flex"
+                    flexDirection="column"
+                    gap={{ base: 0, md: 4 }}
+                    overflow="hidden"
+                    margin={"0"}
                   >
                     <Box
-                      display="flex"
-                      justifyContent="center"
-                      alignItems="flex-start"
-                      minH="full"
-                      w="full"
+                      flex="1"
+                      minH="0"
                       minW="0"
-                      p={{ base: 1, md: 2 }}
+                      overflow="auto"
+                      overscrollBehavior="contain"
+                      borderRadius={{ base: '0', md: 'panel' }}
                     >
-                      <ComposedStage
-                        canvasAspectRatio={canvasAspectRatio}
-                        canvasBackgroundColor={template.canvas.background}
-                        frameBoxStyle={frameBoxStyle}
-                        frameBorderRadius={frameBorderRadius}
-                        previewBorderRadius={previewBorderRadius}
-                        showOverlay={showFrameOverlay}
-                        overlaySrc={previewOverlaySrc}
-                        overlayAlt={`${templateLabel} preview overlay`}
-                        imageUrl={imageUrl}
-                        imageMetrics={imageMetrics}
-                        renderedImageStyle={renderedImageStyle}
-                        dragging={dragging}
-                        viewportRef={fineTuneViewportRef}
-                        onPointerDown={handlePointerDown}
-                        onPointerMove={handlePointerMove}
-                        onPointerUp={handlePointerUp}
-                        placeholderTitle="请先上传图片"
-                        width="100%"
-                        maxWidth="100%"
-                      />
-                    </Box>
-                  </Box>
-                  <Card.Root
-                    borderRadius="panel"
-                    bg="panelFloat"
-                    borderColor="border"
-                    backdropFilter="blur(18px)"
-                    boxShadow="floating"
-                    flexShrink={0}
-                    position={"fixed"} zIndex={"10"} bottom={"28px"} w={"calc(100vw - 56px)"}
-                  >
-                    <Card.Body p={{ base: 3, md: 4 }}>
-                      <Stack gap={4}>
-                        <Flex justify="center" align="center" gap={3} wrap="wrap">
-                          <Badge {...cardBadgeProps}>
-                            当前缩放 {scale.toFixed(2)}x
-                          </Badge>
-                        </Flex>
-
-                        <Slider.Root
-                          size="lg"
-                          value={[scale]}
-                          min={scaleBounds.min}
-                          max={scaleBounds.max}
-                          step={0.01}
-                          disabled={!imageMetrics}
-                          onValueChange={(details) => applyScale(details.value[0] ?? scale)}
-                        >
-                          <Slider.Control>
-                            <Slider.Track>
-                              <Slider.Range />
-                            </Slider.Track>
-                            <Slider.Thumbs />
-                          </Slider.Control>
-                        </Slider.Root>
-
-                        <ScaleControlRow
+                      <Box
+                        display="flex"
+                        justifyContent="center"
+                        alignItems="flex-start"
+                        minH="full"
+                        w="full"
+                        minW="0"
+                        p={{ base: 0, md: 2 }}
+                      >
+                        <ComposedStage
+                          canvasAspectRatio={canvasAspectRatio}
+                          canvasBackgroundColor={template.canvas.background}
+                          frameBoxStyle={frameBoxStyle}
+                          frameBorderRadius={frameBorderRadius}
+                          previewBorderRadius={previewBorderRadius}
+                          showOverlay={showFrameOverlay}
+                          overlaySrc={previewOverlaySrc}
+                          overlayAlt={`${templateLabel} preview overlay`}
+                          imageUrl={imageUrl}
                           imageMetrics={imageMetrics}
-                          onScaleDown={() => handleScaleNudge(-1)}
-                          onRecenter={handleRecenter}
-                          onScaleUp={() => handleScaleNudge(1)}
+                          renderedImageStyle={renderedImageStyle}
+                          dragging={dragging}
+                          viewportRef={fineTuneViewportRef}
+                          onPointerDown={handlePointerDown}
+                          onPointerMove={handlePointerMove}
+                          onPointerUp={handlePointerUp}
+                          placeholderTitle="请先上传图片"
+                          width="100%"
+                          maxWidth="100%"
                         />
-                      </Stack>
-                    </Card.Body>
-                  </Card.Root>
-                </Dialog.Body>
-              </Dialog.Content>
+                      </Box>
+                    </Box>
+                    <Card.Root
+                      borderRadius="panel"
+                      bg="panelFloat"
+                      borderColor="border"
+                      backdropFilter="blur(18px)"
+                      boxShadow="floating"
+                      flexShrink={0}
+                    >
+                      <Card.Body p={{ base: 3, md: 4 }}>
+                        <Stack gap={4}>
+                          <Flex justify="center" align="center" gap={3} wrap="wrap">
+                            <Badge {...cardBadgeProps}>
+                              当前缩放 {scale.toFixed(2)}x
+                            </Badge>
+                          </Flex>
+
+                          <Slider.Root
+                            size="lg"
+                            value={[scale]}
+                            min={scaleBounds.min}
+                            max={scaleBounds.max}
+                            step={0.01}
+                            disabled={!imageMetrics}
+                            onValueChange={(details) => applyScale(details.value[0] ?? scale)}
+                          >
+                            <Slider.Control>
+                              <Slider.Track>
+                                <Slider.Range />
+                              </Slider.Track>
+                              <Slider.Thumbs />
+                            </Slider.Control>
+                          </Slider.Root>
+
+                          <ScaleControlRow
+                            imageMetrics={imageMetrics}
+                            onScaleDown={() => handleScaleNudge(-1)}
+                            onRecenter={handleRecenter}
+                            onScaleUp={() => handleScaleNudge(1)}
+                          />
+                        </Stack>
+                      </Card.Body>
+                    </Card.Root>
+                  </Dialog.Body>
+                </Dialog.Content>
+              </Stack>
             </Dialog.Positioner>
           </Theme>
         </Portal>
