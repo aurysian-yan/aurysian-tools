@@ -20,6 +20,7 @@ import {
   Text,
   Theme,
 } from '@chakra-ui/react';
+import { Minus, Plus } from 'phosphor-react';
 import {
   ChangeEvent,
   type CSSProperties,
@@ -102,13 +103,32 @@ type ComposedStageProps = {
   onDoubleClick?: () => void;
   placeholderTitle: string;
   placeholderText: string;
+  width?: string;
   maxWidth: string;
   maxHeight?: string;
+};
+
+type ScaleControlRowProps = {
+  imageMetrics: ImageMetrics | null;
+  onScaleDown: () => void;
+  onRecenter: () => void;
+  onScaleUp: () => void;
+};
+
+type PreviewActionRowProps = {
+  imageMetrics: ImageMetrics | null;
+  previewOverlaySrc: string | null;
+  showFrameOverlay: boolean;
+  onOpenFineTune: () => void;
+  onToggleOverlay: () => void;
 };
 
 const PREVIEW_CANVAS_MIN_WIDTH = 220;
 const PREVIEW_CANVAS_MAX_WIDTH = 360;
 const FINE_TUNE_CANVAS_MIN_WIDTH = 260;
+const STABLE_VIEWPORT_HEIGHT = '100svh';
+const PREVIEW_CANVAS_MAX_VIEWPORT_HEIGHT = '75svh';
+const DIALOG_VIEWPORT_MARGIN = '24px';
 const FLOATING_BAR_BLUR_HEIGHT = 108;
 const BACKGROUND_VEIL_SCROLL_DISTANCE = 420;
 const CONTENT_CARD_PADDING = { base: 5, md: 6 } as const;
@@ -294,15 +314,16 @@ function ComposedStage({
   onDoubleClick,
   placeholderTitle,
   placeholderText,
+  width,
   maxWidth,
   maxHeight,
 }: ComposedStageProps) {
   return (
-    <Box display="flex" justifyContent="center">
+    <Box display="flex" justifyContent="center" w="full" minW="0">
       <Box
         ref={viewportRef}
         position="relative"
-        w="full"
+        w={width ?? 'full'}
         maxW={maxWidth}
         maxH={maxHeight}
         aspectRatio={`${canvasAspectRatio}`}
@@ -380,6 +401,84 @@ function ComposedStage({
         ) : null}
       </Box>
     </Box>
+  );
+}
+
+function ScaleControlRow({
+  imageMetrics,
+  onScaleDown,
+  onRecenter,
+  onScaleUp,
+}: ScaleControlRowProps) {
+  const isDisabled = !imageMetrics;
+
+  return (
+    <HStack gap={3} align="stretch">
+      <Button
+        variant="outline"
+        size="lg"
+        borderRadius="full"
+        minW="48px"
+        w="48px"
+        minH="48px"
+        h="48px"
+        px="0"
+        aria-label="缩小"
+        onClick={onScaleDown}
+        disabled={isDisabled}
+      >
+        <Minus size={18} weight="bold" aria-hidden="true" />
+      </Button>
+      <Button variant="outline" size="lg" flex="1" onClick={onRecenter} disabled={isDisabled}>
+        居中重置
+      </Button>
+      <Button
+        variant="outline"
+        size="lg"
+        borderRadius="full"
+        minW="48px"
+        w="48px"
+        minH="48px"
+        h="48px"
+        px="0"
+        aria-label="放大"
+        onClick={onScaleUp}
+        disabled={isDisabled}
+      >
+        <Plus size={18} weight="bold" aria-hidden="true" />
+      </Button>
+    </HStack>
+  );
+}
+
+function PreviewActionRow({
+  imageMetrics,
+  previewOverlaySrc,
+  showFrameOverlay,
+  onOpenFineTune,
+  onToggleOverlay,
+}: PreviewActionRowProps) {
+  return (
+    <Grid templateColumns="repeat(2, minmax(0, 1fr))" gap={3}>
+      <Button
+        size="lg"
+        colorPalette="gray"
+        variant="subtle"
+        onClick={onOpenFineTune}
+        disabled={!imageMetrics}
+      >
+        放大微调
+      </Button>
+      <Button
+        size="lg"
+        variant={showFrameOverlay ? 'solid' : 'outline'}
+        colorPalette="gray"
+        disabled={!previewOverlaySrc}
+        onClick={onToggleOverlay}
+      >
+        {showFrameOverlay ? '隐藏表盘预览图' : '叠加表盘预览图'}
+      </Button>
+    </Grid>
   );
 }
 
@@ -772,306 +871,281 @@ function App({ appearance }: AppProps) {
 
       <Box as="main" position="relative" zIndex={2} py={{ base: 4, md: 8 }} pb={{ base: '168px', md: '188px' }}>
         <Container maxW="7xl" px="16px">
-        <Stack gap={{ base: 4, md: 6 }}>
-          <Card.Root
-            {...surfaceCardProps}
-            borderRadius="panel"
-            display={{ base: 'block', xl: 'none' }}
-          >
-            <Card.Body p={CONTENT_CARD_PADDING}>
-              <Grid templateColumns={{ base: '1fr', md: '1fr 1fr' }} gap={{ base: 4, md: 5 }} alignItems="end">
-                <Field.Root>
-                  <Field.Label>表盘</Field.Label>
-                  <NativeSelect.Root size="lg">
-                    <NativeSelect.Field
-                      value={template.watchface.previewKey}
-                      onChange={handleWatchfaceChange}
-                    >
-                      {watchfaceOptions.map((item) => (
-                        <option key={item.value} value={item.value}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </NativeSelect.Field>
-                    <NativeSelect.Indicator />
-                  </NativeSelect.Root>
-                </Field.Root>
-                <Field.Root>
-                  <Field.Label>设备</Field.Label>
-                  <NativeSelect.Root size="lg">
-                    <NativeSelect.Field
-                      value={template.deviceKey}
-                      onChange={handleDeviceChange}
-                    >
-                      {deviceOptions.map((item) => (
-                        <option key={item.value} value={item.value}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </NativeSelect.Field>
-                    <NativeSelect.Indicator />
-                  </NativeSelect.Root>
-                </Field.Root>
-              </Grid>
-            </Card.Body>
-          </Card.Root>
-
-          <Grid templateColumns={{ base: '1fr', xl: 'minmax(0, 1.35fr) minmax(300px, 360px)' }} gap={{ base: 4, md: 6 }}>
+          <Stack gap={{ base: 4, md: 6 }}>
             <Card.Root
               {...surfaceCardProps}
               borderRadius="panel"
+              display={{ base: 'block', xl: 'none' }}
             >
               <Card.Body p={CONTENT_CARD_PADDING}>
-                <Stack gap={5}>
-                  <Flex justify="space-between" align="start" gap={3} wrap="wrap">
-                    <Stack gap={2}>
-                      <Heading as="h2" size="md">
-                        壁纸预览
-                      </Heading>
-                      <Text color="fg.muted">
-                        微调图片位置并预览效果，双击图片以放大
-                      </Text>
-                    </Stack>
-                    <HStack gap={2} wrap="wrap">
-                      <Badge {...cardBadgeProps}>
-                        画布 {template.canvas.width} × {template.canvas.height}
-                      </Badge>
-                      <Badge {...cardBadgeProps}>
-                        窗口 {template.frame.width} × {template.frame.height}
-                      </Badge>
-                      <Badge {...cardBadgeProps}>
-                        {templateLabel}
-                      </Badge>
-                    </HStack>
-                  </Flex>
-
-                  <ComposedStage
-                    canvasAspectRatio={canvasAspectRatio}
-                    canvasBackgroundColor={template.canvas.background}
-                    frameBoxStyle={frameBoxStyle}
-                    frameBorderRadius={frameBorderRadius}
-                    previewBorderRadius={previewBorderRadius}
-                    showOverlay={showFrameOverlay}
-                    overlaySrc={previewOverlaySrc}
-                    overlayAlt={`${templateLabel} preview overlay`}
-                    imageUrl={imageUrl}
-                    imageMetrics={imageMetrics}
-                    renderedImageStyle={renderedImageStyle}
-                    dragging={dragging}
-                    viewportRef={previewViewportRef}
-                    onPointerDown={handlePointerDown}
-                    onPointerMove={handlePointerMove}
-                    onPointerUp={handlePointerUp}
-                    onDoubleClick={imageMetrics ? () => setIsFineTuneOpen(true) : undefined}
-                    placeholderTitle="请先导入图片"
-                    maxWidth={`min(100%, ${PREVIEW_CANVAS_MAX_WIDTH}px, calc(75vh * ${canvasAspectRatio}))`}
-                  />
-
-                  <Card.Root
-                    {...surfaceCardProps}
-                    borderRadius="subpanel"
-                    display={{ base: 'block', xl: 'none' }}
-                    bg={{ base: 'transparent', md: surfaceCardProps.bg }}
-                    borderColor={{ base: 'transparent', md: surfaceCardProps.borderColor }}
-                    borderWidth={{ base: '0', md: surfaceCardProps.borderWidth }}
-                    boxShadow={{ base: 'none', md: surfaceCardProps.boxShadow }}
-                  >
-                    <Card.Body p={{ base: 0, md: CONTENT_CARD_PADDING.md }}>
-                      <Stack gap={4}>
-                        <Flex justify="space-between" align="center" gap={3} wrap="wrap">
-                          <Text fontWeight="700">尺寸与微调</Text>
-                          <Badge {...cardBadgeProps}>
-                            当前缩放 {scale.toFixed(2)}x
-                          </Badge>
-                        </Flex>
-
-                        <Slider.Root
-                          size="lg"
-                          value={[scale]}
-                          min={scaleBounds.min}
-                          max={scaleBounds.max}
-                          step={0.01}
-                          disabled={!imageMetrics}
-                          onValueChange={(details) => applyScale(details.value[0] ?? scale)}
-                        >
-                          <Slider.Control>
-                            <Slider.Track>
-                              <Slider.Range />
-                            </Slider.Track>
-                            <Slider.Thumbs />
-                          </Slider.Control>
-                        </Slider.Root>
-
-                        <Grid
-                          templateColumns={{ base: 'repeat(2, minmax(0, 1fr))', md: 'repeat(4, minmax(0, 1fr))' }}
-                          gap={3}
-                        >
-                          <Button variant="outline" size="lg" onClick={() => handleScaleNudge(-1)} disabled={!imageMetrics}>
-                            缩小
-                          </Button>
-                          <Button variant="outline" size="lg" onClick={() => handleScaleNudge(1)} disabled={!imageMetrics}>
-                            放大
-                          </Button>
-                          <Button variant="outline" size="lg" onClick={handleRecenter} disabled={!imageMetrics}>
-                            居中重置
-                          </Button>
-                          <Button size="lg" colorPalette="gray" variant="subtle" onClick={() => setIsFineTuneOpen(true)} disabled={!imageMetrics}>
-                            放大微调
-                          </Button>
-                        </Grid>
-
-                        <Button
-                          size="lg"
-                          variant={showFrameOverlay ? 'solid' : 'outline'}
-                          colorPalette="gray"
-                          disabled={!previewOverlaySrc}
-                          onClick={() => setShowFrameOverlay((current) => !current)}
-                        >
-                          {showFrameOverlay ? '隐藏设备预览图' : '叠加设备预览图'}
-                        </Button>
-                        {!previewOverlaySrc ? (
-                          <Text fontSize="sm" color="fg.muted">
-                            当前模板未找到对应预览图，预期文件名是 `{previewAssetPath.replace('./preview/', '')}`。
-                          </Text>
-                        ) : null}
-                      </Stack>
-                    </Card.Body>
-                  </Card.Root>
-                </Stack>
+                <Grid templateColumns={{ base: '1fr', md: '1fr 1fr' }} gap={{ base: 4, md: 5 }} alignItems="end">
+                  <Field.Root>
+                    <Field.Label>表盘</Field.Label>
+                    <NativeSelect.Root size="lg">
+                      <NativeSelect.Field
+                        value={template.watchface.previewKey}
+                        onChange={handleWatchfaceChange}
+                      >
+                        {watchfaceOptions.map((item) => (
+                          <option key={item.value} value={item.value}>
+                            {item.label}
+                          </option>
+                        ))}
+                      </NativeSelect.Field>
+                      <NativeSelect.Indicator />
+                    </NativeSelect.Root>
+                  </Field.Root>
+                  <Field.Root>
+                    <Field.Label>设备</Field.Label>
+                    <NativeSelect.Root size="lg">
+                      <NativeSelect.Field
+                        value={template.deviceKey}
+                        onChange={handleDeviceChange}
+                      >
+                        {deviceOptions.map((item) => (
+                          <option key={item.value} value={item.value}>
+                            {item.label}
+                          </option>
+                        ))}
+                      </NativeSelect.Field>
+                      <NativeSelect.Indicator />
+                    </NativeSelect.Root>
+                  </Field.Root>
+                </Grid>
               </Card.Body>
             </Card.Root>
 
-            <Stack gap={{ base: 4, md: 6 }}>
+            <Grid templateColumns={{ base: '1fr', xl: 'minmax(0, 1.35fr) minmax(300px, 360px)' }} gap={{ base: 4, md: 6 }}>
               <Card.Root
                 {...surfaceCardProps}
                 borderRadius="panel"
-                display={{ base: 'none', xl: 'block' }}
               >
                 <Card.Body p={CONTENT_CARD_PADDING}>
-                  <Stack gap={4}>
-                    <Field.Root>
-                      <Field.Label>表盘</Field.Label>
-                      <NativeSelect.Root size="lg">
-                        <NativeSelect.Field
-                          value={template.watchface.previewKey}
-                          onChange={handleWatchfaceChange}
-                        >
-                          {watchfaceOptions.map((item) => (
-                            <option key={item.value} value={item.value}>
-                              {item.label}
-                            </option>
-                          ))}
-                        </NativeSelect.Field>
-                        <NativeSelect.Indicator />
-                      </NativeSelect.Root>
-                    </Field.Root>
-                    <Field.Root>
-                      <Field.Label>设备</Field.Label>
-                      <NativeSelect.Root size="lg">
-                        <NativeSelect.Field
-                          value={template.deviceKey}
-                          onChange={handleDeviceChange}
-                        >
-                          {deviceOptions.map((item) => (
-                            <option key={item.value} value={item.value}>
-                              {item.label}
-                            </option>
-                          ))}
-                        </NativeSelect.Field>
-                        <NativeSelect.Indicator />
-                      </NativeSelect.Root>
-                    </Field.Root>
-                  </Stack>
-                </Card.Body>
-              </Card.Root>
-
-              <Card.Root
-                {...surfaceCardProps}
-                borderRadius="subpanel"
-                display={{ base: 'none', xl: 'block' }}
-              >
-                <Card.Body p={CONTENT_CARD_PADDING}>
-                  <Stack gap={4}>
-                    <Flex justify="space-between" align="center" gap={3} wrap="wrap">
-                      <Text fontWeight="700">尺寸与微调</Text>
-                      <Badge {...cardBadgeProps}>
-                        当前缩放 {scale.toFixed(2)}x
-                      </Badge>
+                  <Stack gap={5}>
+                    <Flex justify="space-between" align="start" gap={3} wrap="wrap">
+                      <Stack gap={2}>
+                        <Heading as="h2" size="md">
+                          壁纸预览
+                        </Heading>
+                        <Text color="fg.muted">
+                          微调图片位置并预览效果，双击图片以放大
+                        </Text>
+                      </Stack>
+                      <HStack gap={2} wrap="wrap">
+                        <Badge {...cardBadgeProps}>
+                          画布 {template.canvas.width} × {template.canvas.height}
+                        </Badge>
+                        <Badge {...cardBadgeProps}>
+                          窗口 {template.frame.width} × {template.frame.height}
+                        </Badge>
+                        <Badge {...cardBadgeProps}>
+                          {templateLabel}
+                        </Badge>
+                      </HStack>
                     </Flex>
 
-                    <Slider.Root
-                      size="lg"
-                      value={[scale]}
-                      min={scaleBounds.min}
-                      max={scaleBounds.max}
-                      step={0.01}
-                      disabled={!imageMetrics}
-                      onValueChange={(details) => applyScale(details.value[0] ?? scale)}
-                    >
-                      <Slider.Control>
-                        <Slider.Track>
-                          <Slider.Range />
-                        </Slider.Track>
-                        <Slider.Thumbs />
-                      </Slider.Control>
-                    </Slider.Root>
+                    <ComposedStage
+                      canvasAspectRatio={canvasAspectRatio}
+                      canvasBackgroundColor={template.canvas.background}
+                      frameBoxStyle={frameBoxStyle}
+                      frameBorderRadius={frameBorderRadius}
+                      previewBorderRadius={previewBorderRadius}
+                      showOverlay={showFrameOverlay}
+                      overlaySrc={previewOverlaySrc}
+                      overlayAlt={`${templateLabel} preview overlay`}
+                      imageUrl={imageUrl}
+                      imageMetrics={imageMetrics}
+                      renderedImageStyle={renderedImageStyle}
+                      dragging={dragging}
+                      viewportRef={previewViewportRef}
+                      onPointerDown={handlePointerDown}
+                      onPointerMove={handlePointerMove}
+                      onPointerUp={handlePointerUp}
+                      onDoubleClick={imageMetrics ? () => setIsFineTuneOpen(true) : undefined}
+                      placeholderTitle="请先导入图片"
+                      maxWidth={`min(100%, ${PREVIEW_CANVAS_MAX_WIDTH}px, calc(${PREVIEW_CANVAS_MAX_VIEWPORT_HEIGHT} * ${canvasAspectRatio}))`}
+                    />
 
-                    <Grid templateColumns="repeat(2, minmax(0, 1fr))" gap={3}>
-                      <Button variant="outline" size="lg" onClick={() => handleScaleNudge(-1)} disabled={!imageMetrics}>
-                        缩小
-                      </Button>
-                      <Button variant="outline" size="lg" onClick={() => handleScaleNudge(1)} disabled={!imageMetrics}>
-                        放大
-                      </Button>
-                      <Button variant="outline" size="lg" onClick={handleRecenter} disabled={!imageMetrics}>
-                        居中重置
-                      </Button>
-                      <Button size="lg" colorPalette="gray" variant="subtle" onClick={() => setIsFineTuneOpen(true)} disabled={!imageMetrics}>
-                        放大微调
-                      </Button>
-                    </Grid>
-
-                    <Button
-                      size="lg"
-                      variant={showFrameOverlay ? 'solid' : 'outline'}
-                      colorPalette="gray"
-                      disabled={!previewOverlaySrc}
-                      onClick={() => setShowFrameOverlay((current) => !current)}
+                    <Card.Root
+                      {...surfaceCardProps}
+                      borderRadius="subpanel"
+                      display={{ base: 'block', xl: 'none' }}
+                      bg={{ base: 'transparent', md: surfaceCardProps.bg }}
+                      borderColor={{ base: 'transparent', md: surfaceCardProps.borderColor }}
+                      borderWidth={{ base: '0', md: surfaceCardProps.borderWidth }}
+                      boxShadow={{ base: 'none', md: surfaceCardProps.boxShadow }}
                     >
-                      {showFrameOverlay ? '隐藏设备预览图' : '叠加设备预览图'}
-                    </Button>
-                    {!previewOverlaySrc ? (
-                      <Text fontSize="sm" color="fg.muted">
-                        当前模板未找到对应预览图，预期文件名是 `{previewAssetPath.replace('./preview/', '')}`。
-                      </Text>
-                    ) : null}
+                      <Card.Body p={{ base: 0, md: CONTENT_CARD_PADDING.md }}>
+                        <Stack gap={4}>
+                          <Flex justify="space-between" align="center" gap={3} wrap="wrap">
+                            <Text fontWeight="700">尺寸与微调</Text>
+                            <Badge {...cardBadgeProps}>
+                              当前缩放 {scale.toFixed(2)}x
+                            </Badge>
+                          </Flex>
+
+                          <Slider.Root
+                            size="lg"
+                            value={[scale]}
+                            min={scaleBounds.min}
+                            max={scaleBounds.max}
+                            step={0.01}
+                            disabled={!imageMetrics}
+                            onValueChange={(details) => applyScale(details.value[0] ?? scale)}
+                          >
+                            <Slider.Control>
+                              <Slider.Track>
+                                <Slider.Range />
+                              </Slider.Track>
+                              <Slider.Thumbs />
+                            </Slider.Control>
+                          </Slider.Root>
+
+                          <ScaleControlRow
+                            imageMetrics={imageMetrics}
+                            onScaleDown={() => handleScaleNudge(-1)}
+                            onRecenter={handleRecenter}
+                            onScaleUp={() => handleScaleNudge(1)}
+                          />
+                          <PreviewActionRow
+                            imageMetrics={imageMetrics}
+                            previewOverlaySrc={previewOverlaySrc}
+                            showFrameOverlay={showFrameOverlay}
+                            onOpenFineTune={() => setIsFineTuneOpen(true)}
+                            onToggleOverlay={() => setShowFrameOverlay((current) => !current)}
+                          />
+                          {!previewOverlaySrc ? (
+                            <Text fontSize="sm" color="fg.muted">
+                              当前模板未找到对应预览图，预期文件名是 `{previewAssetPath.replace('./preview/', '')}`。
+                            </Text>
+                          ) : null}
+                        </Stack>
+                      </Card.Body>
+                    </Card.Root>
                   </Stack>
                 </Card.Body>
               </Card.Root>
-            </Stack>
-          </Grid>
 
-          <Flex justify="center" pt={{ base: 4, md: 6 }}>
-            <Box
-              role="img"
-              aria-label="Aurysian"
-              h="16px"
-              w="142px"
-              maxW="min(142px, 62vw)"
-              opacity={0.92}
-              userSelect="none"
-              bg="fg"
-              maskImage={`url(${aurysianLogo})`}
-              maskRepeat="no-repeat"
-              maskPosition="center"
-              maskSize="contain"
-              WebkitMaskImage={`url(${aurysianLogo})`}
-              WebkitMaskRepeat="no-repeat"
-              WebkitMaskPosition="center"
-              WebkitMaskSize="contain"
-            />
-          </Flex>
-        </Stack>
+              <Stack gap={{ base: 4, md: 6 }}>
+                <Card.Root
+                  {...surfaceCardProps}
+                  borderRadius="panel"
+                  display={{ base: 'none', xl: 'block' }}
+                >
+                  <Card.Body p={CONTENT_CARD_PADDING}>
+                    <Stack gap={4}>
+                      <Field.Root>
+                        <Field.Label>表盘</Field.Label>
+                        <NativeSelect.Root size="lg">
+                          <NativeSelect.Field
+                            value={template.watchface.previewKey}
+                            onChange={handleWatchfaceChange}
+                          >
+                            {watchfaceOptions.map((item) => (
+                              <option key={item.value} value={item.value}>
+                                {item.label}
+                              </option>
+                            ))}
+                          </NativeSelect.Field>
+                          <NativeSelect.Indicator />
+                        </NativeSelect.Root>
+                      </Field.Root>
+                      <Field.Root>
+                        <Field.Label>设备</Field.Label>
+                        <NativeSelect.Root size="lg">
+                          <NativeSelect.Field
+                            value={template.deviceKey}
+                            onChange={handleDeviceChange}
+                          >
+                            {deviceOptions.map((item) => (
+                              <option key={item.value} value={item.value}>
+                                {item.label}
+                              </option>
+                            ))}
+                          </NativeSelect.Field>
+                          <NativeSelect.Indicator />
+                        </NativeSelect.Root>
+                      </Field.Root>
+                    </Stack>
+                  </Card.Body>
+                </Card.Root>
+
+                <Card.Root
+                  {...surfaceCardProps}
+                  borderRadius="subpanel"
+                  display={{ base: 'none', xl: 'block' }}
+                >
+                  <Card.Body p={CONTENT_CARD_PADDING}>
+                    <Stack gap={4}>
+                      <Flex justify="space-between" align="center" gap={3} wrap="wrap">
+                        <Text fontWeight="700">尺寸与微调</Text>
+                        <Badge {...cardBadgeProps}>
+                          当前缩放 {scale.toFixed(2)}x
+                        </Badge>
+                      </Flex>
+
+                      <Slider.Root
+                        size="lg"
+                        value={[scale]}
+                        min={scaleBounds.min}
+                        max={scaleBounds.max}
+                        step={0.01}
+                        disabled={!imageMetrics}
+                        onValueChange={(details) => applyScale(details.value[0] ?? scale)}
+                      >
+                        <Slider.Control>
+                          <Slider.Track>
+                            <Slider.Range />
+                          </Slider.Track>
+                          <Slider.Thumbs />
+                        </Slider.Control>
+                      </Slider.Root>
+
+                      <ScaleControlRow
+                        imageMetrics={imageMetrics}
+                        onScaleDown={() => handleScaleNudge(-1)}
+                        onRecenter={handleRecenter}
+                        onScaleUp={() => handleScaleNudge(1)}
+                      />
+                      <PreviewActionRow
+                        imageMetrics={imageMetrics}
+                        previewOverlaySrc={previewOverlaySrc}
+                        showFrameOverlay={showFrameOverlay}
+                        onOpenFineTune={() => setIsFineTuneOpen(true)}
+                        onToggleOverlay={() => setShowFrameOverlay((current) => !current)}
+                      />
+                      {!previewOverlaySrc ? (
+                        <Text fontSize="sm" color="fg.muted">
+                          当前模板未找到对应预览图，预期文件名是 `{previewAssetPath.replace('./preview/', '')}`。
+                        </Text>
+                      ) : null}
+                    </Stack>
+                  </Card.Body>
+                </Card.Root>
+              </Stack>
+            </Grid>
+
+            <Flex justify="center" pt={{ base: 4, md: 6 }}>
+              <Box
+                role="img"
+                aria-label="Aurysian"
+                h="16px"
+                w="142px"
+                maxW="min(142px, 62vw)"
+                opacity={0.92}
+                userSelect="none"
+                bg="fg"
+                maskImage={`url(${aurysianLogo})`}
+                maskRepeat="no-repeat"
+                maskPosition="center"
+                maskSize="contain"
+                WebkitMaskImage={`url(${aurysianLogo})`}
+                WebkitMaskRepeat="no-repeat"
+                WebkitMaskPosition="center"
+                WebkitMaskSize="contain"
+              />
+            </Flex>
+          </Stack>
         </Container>
       </Box>
 
@@ -1138,93 +1212,134 @@ function App({ appearance }: AppProps) {
         <Portal>
           <Theme appearance={appearance} hasBackground={false}>
             <Dialog.Backdrop bg="blackAlpha.700" backdropFilter="blur(6px)" />
-            <Dialog.Positioner p={{ base: 3, md: 6 }}>
+            <Dialog.Positioner p={{ base: 3, md: 6 }} overflow="hidden">
               <Dialog.Content
-                maxW="min(96vw, 720px)"
-                borderRadius={{ base: 'subpanel', md: 'panelLg' }}
+                w="min(96vw, 1400px)"
+                maxW="96vw"
+                h={`calc(${STABLE_VIEWPORT_HEIGHT} - var(--dialog-base-margin) - 24px)`}
+                maxH={`calc(${STABLE_VIEWPORT_HEIGHT} - var(--dialog-base-margin) - 24px)`}
+                borderRadius={"32px"}
                 bg="bg.panel"
                 overflow="hidden"
+                display="flex"
+                flexDirection="column"
               >
-                <Dialog.Header px={{ base: 4, md: 6 }} pt={{ base: 4, md: 6 }} pb={3}>
-                  <Flex justify="space-between" align="start" gap={3}>
-                    <Box>
-                      <Dialog.Title fontSize={{ base: 'lg', md: 'xl' }}>
-                        放大微调
-                      </Dialog.Title>
-                      <Dialog.Description></Dialog.Description>
-                    </Box>
-                    <CloseButton onClick={() => setIsFineTuneOpen(false)} />
-                  </Flex>
+                <Box position={"fixed"} top={"34px"} left={"24px"}>
+                  <Dialog.Title fontSize={{ base: 'lg', md: 'xl' }} m="0" color={"white"}>
+                    放大微调
+                  </Dialog.Title>
+                </Box>
+                <Dialog.Header px={{ base: 4, md: 6 }} pt={{ base: 4, md: 6 }} pb={3} flexShrink={0} position={"fixed"} zIndex={"10"} right={"12px"}>
+                  <Card.Root
+                    borderRadius="full"
+                    bg="panelFloat"
+                    borderColor="border"
+                    backdropFilter="blur(18px)"
+                    boxShadow="floating"
+                    w="full"
+                  >
+                    <Card.Body p="4px">
+                      <Flex justify="space-between" align="center" gap={3} w="full">
+                        <CloseButton onClick={() => setIsFineTuneOpen(false)} />
+                      </Flex>
+                    </Card.Body>
+                  </Card.Root>
                 </Dialog.Header>
 
-                <Dialog.Body px={{ base: 4, md: 6 }} pb={{ base: 4, md: 6 }}>
-                  <Stack gap={5}>
-                    <ComposedStage
-                      canvasAspectRatio={canvasAspectRatio}
-                      canvasBackgroundColor={template.canvas.background}
-                      frameBoxStyle={frameBoxStyle}
-                      frameBorderRadius={frameBorderRadius}
-                      previewBorderRadius={previewBorderRadius}
-                      showOverlay={showFrameOverlay}
-                      overlaySrc={previewOverlaySrc}
-                      overlayAlt={`${templateLabel} preview overlay`}
-                      imageUrl={imageUrl}
-                      imageMetrics={imageMetrics}
-                      renderedImageStyle={renderedImageStyle}
-                      dragging={dragging}
-                      viewportRef={fineTuneViewportRef}
-                      onPointerDown={handlePointerDown}
-                      onPointerMove={handlePointerMove}
-                      onPointerUp={handlePointerUp}
-                      placeholderTitle="先上传图片"
-                      placeholderText="上传后会按同一比例放大显示这张预览图"
-                      maxWidth={`min(92vw, calc(78dvh * ${canvasAspectRatio}))`}
-                      maxHeight="78dvh"
-                    />
+                <Dialog.Body
+                  py={"0"}
+                  px={{ base: 4, md: 6 }}
+                  flex="1"
+                  minH="0"
+                  display="flex"
+                  flexDirection="column"
+                  gap={4}
+                  overflow="hidden"
+                >
+                  <Box
+                    flex="1"
+                    minH="0"
+                    minW="0"
+                    overflow="auto"
+                    overscrollBehavior="contain"
+                    pb="172px"
+                    pt="72px"
+                  >
+                    <Box
+                      display="flex"
+                      justifyContent="center"
+                      alignItems="flex-start"
+                      minH="full"
+                      w="full"
+                      minW="0"
+                      p={{ base: 1, md: 2 }}
+                    >
+                      <ComposedStage
+                        canvasAspectRatio={canvasAspectRatio}
+                        canvasBackgroundColor={template.canvas.background}
+                        frameBoxStyle={frameBoxStyle}
+                        frameBorderRadius={frameBorderRadius}
+                        previewBorderRadius={previewBorderRadius}
+                        showOverlay={showFrameOverlay}
+                        overlaySrc={previewOverlaySrc}
+                        overlayAlt={`${templateLabel} preview overlay`}
+                        imageUrl={imageUrl}
+                        imageMetrics={imageMetrics}
+                        renderedImageStyle={renderedImageStyle}
+                        dragging={dragging}
+                        viewportRef={fineTuneViewportRef}
+                        onPointerDown={handlePointerDown}
+                        onPointerMove={handlePointerMove}
+                        onPointerUp={handlePointerUp}
+                        placeholderTitle="请先上传图片"
+                        width="100%"
+                        maxWidth="100%"
+                      />
+                    </Box>
+                  </Box>
+                  <Card.Root
+                    borderRadius="panel"
+                    bg="panelFloat"
+                    borderColor="border"
+                    backdropFilter="blur(18px)"
+                    boxShadow="floating"
+                    flexShrink={0}
+                    position={"fixed"} zIndex={"10"} bottom={"28px"} w={"calc(100vw - 56px)"}
+                  >
+                    <Card.Body p={{ base: 3, md: 4 }}>
+                      <Stack gap={4}>
+                        <Flex justify="center" align="center" gap={3} wrap="wrap">
+                          <Badge {...cardBadgeProps}>
+                            当前缩放 {scale.toFixed(2)}x
+                          </Badge>
+                        </Flex>
 
-                    <Stack gap={4}>
-                      <Flex justify="space-between" align="center" gap={3} wrap="wrap">
-                        <Badge {...cardBadgeProps}>
-                          当前缩放 {scale.toFixed(2)}x
-                        </Badge>
-                        <Text color="fg.muted" fontSize="sm">
-                          这里和主界面看到的是同一套位置与比例，只是更大更适合精修。
-                        </Text>
-                      </Flex>
+                        <Slider.Root
+                          size="lg"
+                          value={[scale]}
+                          min={scaleBounds.min}
+                          max={scaleBounds.max}
+                          step={0.01}
+                          disabled={!imageMetrics}
+                          onValueChange={(details) => applyScale(details.value[0] ?? scale)}
+                        >
+                          <Slider.Control>
+                            <Slider.Track>
+                              <Slider.Range />
+                            </Slider.Track>
+                            <Slider.Thumbs />
+                          </Slider.Control>
+                        </Slider.Root>
 
-                      <Slider.Root
-                        size="lg"
-                        value={[scale]}
-                        min={scaleBounds.min}
-                        max={scaleBounds.max}
-                        step={0.01}
-                        disabled={!imageMetrics}
-                        onValueChange={(details) => applyScale(details.value[0] ?? scale)}
-                      >
-                        <Slider.Control>
-                          <Slider.Track>
-                            <Slider.Range />
-                          </Slider.Track>
-                          <Slider.Thumbs />
-                        </Slider.Control>
-                      </Slider.Root>
-
-                      <Grid
-                        templateColumns={{ base: 'repeat(2, minmax(0, 1fr))', md: 'repeat(3, minmax(0, 1fr))' }}
-                        gap={3}
-                      >
-                        <Button variant="outline" size="lg" onClick={() => handleScaleNudge(-1)} disabled={!imageMetrics}>
-                          缩小
-                        </Button>
-                        <Button variant="outline" size="lg" onClick={() => handleScaleNudge(1)} disabled={!imageMetrics}>
-                          放大
-                        </Button>
-                        <Button variant="outline" size="lg" onClick={handleRecenter} disabled={!imageMetrics}>
-                          居中重置
-                        </Button>
-                      </Grid>
-                    </Stack>
-                  </Stack>
+                        <ScaleControlRow
+                          imageMetrics={imageMetrics}
+                          onScaleDown={() => handleScaleNudge(-1)}
+                          onRecenter={handleRecenter}
+                          onScaleUp={() => handleScaleNudge(1)}
+                        />
+                      </Stack>
+                    </Card.Body>
+                  </Card.Root>
                 </Dialog.Body>
               </Dialog.Content>
             </Dialog.Positioner>

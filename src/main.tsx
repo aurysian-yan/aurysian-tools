@@ -26,7 +26,7 @@ function RootTheme() {
   }, []);
 
   return (
-    <Theme appearance={appearance} bg="page" minH="100dvh">
+    <Theme appearance={appearance} bg="page" minH="100svh">
       <App appearance={appearance} />
     </Theme>
   );

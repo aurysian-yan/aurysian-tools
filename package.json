@@ -12,6 +12,7 @@
     "@chakra-ui/react": "^3.34.0",
     "@emotion/react": "^11.14.0",
     "hyperos-bg": "^0.1.1",
+    "phosphor-react": "^1.4.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-progressive-blur": "^1.0.6"
