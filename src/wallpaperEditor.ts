@@ -23,13 +23,9 @@ export type Position = {
   y: number;
 };
 
-export type DragStartState = {
-  pointerId: number;
-  startX: number;
-  startY: number;
-  startPosition: Position;
-  frameWidth: number;
-  frameHeight: number;
+export type TransformState = {
+  scale: number;
+  position: Position;
 };
 
 export type SelectOption = {
@@ -98,6 +94,34 @@ export function getBoundedPosition(
   return {
     x: clamp(position.x, -limitX, limitX),
     y: clamp(position.y, -limitY, limitY),
+  };
+}
+
+export function getPositionWithAnchor(
+  startPosition: Position,
+  startScale: number,
+  nextScale: number,
+  frame: LayoutTemplate['frame'],
+  startAnchor: Position,
+  nextAnchor: Position = startAnchor,
+) {
+  if (startScale === 0) {
+    return startPosition;
+  }
+
+  const scaleRatio = nextScale / startScale;
+  const startAnchorOffset = {
+    x: startAnchor.x - frame.width / 2,
+    y: startAnchor.y - frame.height / 2,
+  };
+  const nextAnchorOffset = {
+    x: nextAnchor.x - frame.width / 2,
+    y: nextAnchor.y - frame.height / 2,
+  };
+
+  return {
+    x: nextAnchorOffset.x - (startAnchorOffset.x - startPosition.x) * scaleRatio,
+    y: nextAnchorOffset.y - (startAnchorOffset.y - startPosition.y) * scaleRatio,
   };
 }
 

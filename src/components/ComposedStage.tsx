@@ -14,7 +14,7 @@ export type ComposedStageProps = {
   overlayAlt: string;
   imageUrl: string | null;
   imageMetrics: ImageMetrics | null;
-  renderedImageStyle: CSSProperties | undefined;
+  imageViewportStyle: CSSProperties | undefined;
   dragging: boolean;
   viewportRef?: RefObject<HTMLDivElement | null>;
   onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
@@ -55,7 +55,7 @@ export function ComposedStage({
   overlayAlt,
   imageUrl,
   imageMetrics,
-  renderedImageStyle,
+  imageViewportStyle,
   dragging,
   viewportRef,
   onPointerDown,
@@ -82,6 +82,7 @@ export function ComposedStage({
         borderColor="border"
         bg={canvasBackgroundColor}
         overflow="hidden"
+        style={imageViewportStyle}
         onDoubleClick={onDoubleClick}
       >
         <Box
@@ -114,7 +115,15 @@ export function ComposedStage({
                 userSelect="none"
                 pointerEvents="none"
                 maxW="none"
-                style={renderedImageStyle}
+                style={{
+                  width: 'var(--stage-image-width, 100%)',
+                  height: 'var(--stage-image-height, 100%)',
+                  transform: 'translate3d(calc(-50% + var(--stage-image-offset-x, 0%)), calc(-50% + var(--stage-image-offset-y, 0%)), 0) scale(var(--stage-image-scale, 1))',
+                  transformOrigin: 'center center',
+                  transition: 'var(--stage-image-transition, none)',
+                  willChange: 'transform',
+                  backfaceVisibility: 'hidden',
+                }}
               />
               {dragging ? <RuleOfThirdsOverlay /> : null}
             </>

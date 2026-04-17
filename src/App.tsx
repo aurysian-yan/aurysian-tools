@@ -35,7 +35,7 @@ function App({ appearance }: AppProps) {
     overlayAlt: `${editor.templateLabel} preview overlay`,
     imageUrl: editor.imageUrl,
     imageMetrics: editor.imageMetrics,
-    renderedImageStyle: editor.renderedImageStyle,
+    imageViewportStyle: editor.imageViewportStyle,
     dragging: editor.dragging,
     onPointerDown: editor.handlePointerDown,
     onPointerMove: editor.handlePointerMove,

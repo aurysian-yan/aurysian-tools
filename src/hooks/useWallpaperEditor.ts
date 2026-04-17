@@ -16,15 +16,47 @@ import {
   getExportFileName,
   getInitialTemplateId,
   getMinScale,
+  getPositionWithAnchor,
   getTemplateLabel,
   getTemplatePreviewAssetPath,
   getWatchfaceOptions,
   loadImage,
   previewOverlayAssets,
-  type DragStartState,
   type ImageMetrics,
   type Position,
+  type TransformState,
 } from '../wallpaperEditor';
+
+type PointerSnapshot = {
+  clientX: number;
+  clientY: number;
+};
+
+type GestureFrame = {
+  frameLeft: number;
+  frameTop: number;
+  frameWidth: number;
+  frameHeight: number;
+};
+
+type PanGestureState = GestureFrame & {
+  kind: 'pan';
+  pointerId: number;
+  startX: number;
+  startY: number;
+  startPosition: Position;
+};
+
+type PinchGestureState = GestureFrame & {
+  kind: 'pinch';
+  pointerIds: [number, number];
+  startDistance: number;
+  startScale: number;
+  startPosition: Position;
+  startAnchor: Position;
+};
+
+type GestureState = PanGestureState | PinchGestureState;
 
 export function useWallpaperEditor() {
   const [templateId, setTemplateId] = useState(getInitialTemplateId);
@@ -53,7 +85,202 @@ export function useWallpaperEditor() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const previewViewportRef = useRef<HTMLDivElement | null>(null);
   const fineTuneViewportRef = useRef<HTMLDivElement | null>(null);
-  const dragStartRef = useRef<DragStartState | null>(null);
+  const activePointersRef = useRef(new Map<number, PointerSnapshot>());
+  const gestureRef = useRef<GestureState | null>(null);
+  const transformRef = useRef<TransformState>({ scale: 1, position: { x: 0, y: 0 } });
+  const pendingTransformRef = useRef<TransformState | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+
+  function clonePosition(nextPosition: Position) {
+    return { x: nextPosition.x, y: nextPosition.y };
+  }
+
+  function cloneTransform(nextTransform: TransformState): TransformState {
+    return {
+      scale: nextTransform.scale,
+      position: clonePosition(nextTransform.position),
+    };
+  }
+
+  function getViewportTransformStyle(
+    nextTransform: TransformState,
+    animated: boolean,
+  ): CSSProperties | undefined {
+    if (!imageMetrics) {
+      return undefined;
+    }
+
+    const baseScale = getMinScale(imageMetrics, template.frame);
+    const renderedWidth = imageMetrics.width * baseScale;
+    const renderedHeight = imageMetrics.height * baseScale;
+
+    return {
+      '--stage-image-width': `${(renderedWidth / template.frame.width) * 100}%`,
+      '--stage-image-height': `${(renderedHeight / template.frame.height) * 100}%`,
+      '--stage-image-offset-x': `${(nextTransform.position.x / template.frame.width) * 100}%`,
+      '--stage-image-offset-y': `${(nextTransform.position.y / template.frame.height) * 100}%`,
+      '--stage-image-scale': `${nextTransform.scale / baseScale}`,
+      '--stage-image-transition': animated
+        ? 'transform 180ms cubic-bezier(0.22, 1, 0.36, 1)'
+        : 'none',
+    } as CSSProperties;
+  }
+
+  function syncViewportTransform(nextTransform: TransformState, animated: boolean) {
+    const nextStyle = getViewportTransformStyle(nextTransform, animated);
+    const viewportTargets = [previewViewportRef.current, fineTuneViewportRef.current];
+
+    viewportTargets.forEach((viewport) => {
+      if (!viewport || !nextStyle) {
+        return;
+      }
+
+      Object.entries(nextStyle).forEach(([key, value]) => {
+        if (typeof value === 'string') {
+          viewport.style.setProperty(key, value);
+        }
+      });
+    });
+  }
+
+  function flushPendingTransform() {
+    animationFrameRef.current = null;
+
+    const nextTransform = pendingTransformRef.current;
+    if (!nextTransform) {
+      return;
+    }
+
+    pendingTransformRef.current = null;
+    syncViewportTransform(nextTransform, false);
+  }
+
+  function scheduleTransform(nextTransform: TransformState) {
+    const normalizedTransform = cloneTransform(nextTransform);
+    transformRef.current = normalizedTransform;
+    pendingTransformRef.current = normalizedTransform;
+
+    if (typeof window === 'undefined') {
+      syncViewportTransform(normalizedTransform, false);
+      return;
+    }
+
+    if (animationFrameRef.current !== null) {
+      return;
+    }
+
+    animationFrameRef.current = window.requestAnimationFrame(flushPendingTransform);
+  }
+
+  function applyTransformImmediate(nextTransform: TransformState, animated = false) {
+    const normalizedTransform = cloneTransform(nextTransform);
+    transformRef.current = normalizedTransform;
+    pendingTransformRef.current = null;
+
+    if (typeof window !== 'undefined' && animationFrameRef.current !== null) {
+      window.cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
+    syncViewportTransform(normalizedTransform, animated);
+    setScale(normalizedTransform.scale);
+    setPosition(normalizedTransform.position);
+  }
+
+  function getGestureFrame(element: HTMLDivElement): GestureFrame {
+    const rect = element.getBoundingClientRect();
+
+    return {
+      frameLeft: rect.left,
+      frameTop: rect.top,
+      frameWidth: rect.width,
+      frameHeight: rect.height,
+    };
+  }
+
+  function getFramePoint(pointer: PointerSnapshot, frame: GestureFrame) {
+    return {
+      x: ((pointer.clientX - frame.frameLeft) / frame.frameWidth) * template.frame.width,
+      y: ((pointer.clientY - frame.frameTop) / frame.frameHeight) * template.frame.height,
+    };
+  }
+
+  function createPanGesture(
+    pointerId: number,
+    pointer: PointerSnapshot,
+    frame: GestureFrame,
+  ): PanGestureState {
+    return {
+      kind: 'pan',
+      pointerId,
+      startX: pointer.clientX,
+      startY: pointer.clientY,
+      startPosition: clonePosition(transformRef.current.position),
+      ...frame,
+    };
+  }
+
+  function createPinchGesture(
+    pointerIds: [number, number],
+    frame: GestureFrame,
+  ): PinchGestureState | null {
+    const [firstPointerId, secondPointerId] = pointerIds;
+    const firstPointer = activePointersRef.current.get(firstPointerId);
+    const secondPointer = activePointersRef.current.get(secondPointerId);
+
+    if (!firstPointer || !secondPointer) {
+      return null;
+    }
+
+    const midpoint = {
+      clientX: (firstPointer.clientX + secondPointer.clientX) / 2,
+      clientY: (firstPointer.clientY + secondPointer.clientY) / 2,
+    };
+
+    return {
+      kind: 'pinch',
+      pointerIds,
+      startDistance: Math.max(
+        Math.hypot(
+          secondPointer.clientX - firstPointer.clientX,
+          secondPointer.clientY - firstPointer.clientY,
+        ),
+        1,
+      ),
+      startScale: transformRef.current.scale,
+      startPosition: clonePosition(transformRef.current.position),
+      startAnchor: getFramePoint(midpoint, frame),
+      ...frame,
+    };
+  }
+
+  function rebaseGesture(element: HTMLDivElement) {
+    const remainingPointerIds = Array.from(activePointersRef.current.keys());
+
+    if (remainingPointerIds.length >= 2) {
+      const nextGesture = createPinchGesture(
+        [remainingPointerIds[0], remainingPointerIds[1]],
+        getGestureFrame(element),
+      );
+      gestureRef.current = nextGesture;
+      setDragging(Boolean(nextGesture));
+      return;
+    }
+
+    if (remainingPointerIds.length === 1) {
+      const pointerId = remainingPointerIds[0];
+      const pointer = activePointersRef.current.get(pointerId);
+
+      if (pointer) {
+        gestureRef.current = createPanGesture(pointerId, pointer, getGestureFrame(element));
+        setDragging(true);
+        return;
+      }
+    }
+
+    gestureRef.current = null;
+    setDragging(false);
+  }
 
   useEffect(() => {
     return () => {
@@ -81,9 +308,22 @@ export function useWallpaperEditor() {
     }
 
     const minScale = getMinScale(imageMetrics, template.frame);
-    setScale(minScale);
-    setPosition({ x: 0, y: 0 });
+    applyTransformImmediate({
+      scale: minScale,
+      position: { x: 0, y: 0 },
+    });
+    activePointersRef.current.clear();
+    gestureRef.current = null;
+    setDragging(false);
   }, [imageMetrics, template]);
+
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined' && animationFrameRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -127,6 +367,10 @@ export function useWallpaperEditor() {
     return () => media.removeEventListener('change', updateDesktopLayout);
   }, []);
 
+  useEffect(() => {
+    syncViewportTransform({ scale, position }, !dragging);
+  }, [dragging, imageMetrics, position, scale, template]);
+
   const frameBoxStyle = useMemo<CSSProperties>(
     () => ({
       left: `${(template.frame.x / template.canvas.width) * 100}%`,
@@ -162,27 +406,13 @@ export function useWallpaperEditor() {
     [previewAssetPath],
   );
 
-  const renderedImageStyle = useMemo<CSSProperties | undefined>(() => {
+  const imageViewportStyle = useMemo<CSSProperties | undefined>(() => {
     if (!imageMetrics) {
       return undefined;
     }
 
-    const renderedWidth = imageMetrics.width * scale;
-    const renderedHeight = imageMetrics.height * scale;
-
-    return {
-      width: `${(renderedWidth / template.frame.width) * 100}%`,
-      height: `${(renderedHeight / template.frame.height) * 100}%`,
-      transform: `translate(calc(-50% + ${(position.x / template.frame.width) * 100}%), calc(-50% + ${(position.y / template.frame.height) * 100}%))`,
-    };
-  }, [
-    imageMetrics,
-    position.x,
-    position.y,
-    scale,
-    template.frame.height,
-    template.frame.width,
-  ]);
+    return getViewportTransformStyle({ scale, position }, !dragging);
+  }, [dragging, imageMetrics, position, scale, template]);
 
   const scaleBounds = useMemo(() => {
     if (!imageMetrics) {
@@ -255,43 +485,122 @@ export function useWallpaperEditor() {
       return;
     }
 
-    const { width, height } = event.currentTarget.getBoundingClientRect();
-    dragStartRef.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      startPosition: position,
-      frameWidth: width,
-      frameHeight: height,
-    };
-
+    event.preventDefault();
+    activePointersRef.current.set(event.pointerId, {
+      clientX: event.clientX,
+      clientY: event.clientY,
+    });
     event.currentTarget.setPointerCapture(event.pointerId);
-    setDragging(true);
+
+    const pointerIds = Array.from(activePointersRef.current.keys());
+    if (pointerIds.length >= 2) {
+      gestureRef.current = createPinchGesture(
+        [pointerIds[0], pointerIds[1]],
+        getGestureFrame(event.currentTarget),
+      );
+    } else {
+      gestureRef.current = createPanGesture(
+        event.pointerId,
+        activePointersRef.current.get(event.pointerId)!,
+        getGestureFrame(event.currentTarget),
+      );
+    }
+
+    setDragging(Boolean(gestureRef.current));
   }
 
   function handlePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
-    if (!imageMetrics || !dragStartRef.current || dragStartRef.current.pointerId !== event.pointerId) {
+    if (!imageMetrics || !activePointersRef.current.has(event.pointerId)) {
       return;
     }
 
-    const deltaX = event.clientX - dragStartRef.current.startX;
-    const deltaY = event.clientY - dragStartRef.current.startY;
-    const frameScaleX = template.frame.width / dragStartRef.current.frameWidth;
-    const frameScaleY = template.frame.height / dragStartRef.current.frameHeight;
-    const nextPosition = getBoundedPosition(imageMetrics, template.frame, scale, {
-      x: dragStartRef.current.startPosition.x + deltaX * frameScaleX,
-      y: dragStartRef.current.startPosition.y + deltaY * frameScaleY,
+    event.preventDefault();
+    activePointersRef.current.set(event.pointerId, {
+      clientX: event.clientX,
+      clientY: event.clientY,
     });
 
-    setPosition(nextPosition);
+    const gesture = gestureRef.current;
+    if (!gesture) {
+      return;
+    }
+
+    if (gesture.kind === 'pan') {
+      if (gesture.pointerId !== event.pointerId) {
+        return;
+      }
+
+      const deltaX = event.clientX - gesture.startX;
+      const deltaY = event.clientY - gesture.startY;
+      const frameScaleX = template.frame.width / gesture.frameWidth;
+      const frameScaleY = template.frame.height / gesture.frameHeight;
+      const nextPosition = getBoundedPosition(imageMetrics, template.frame, transformRef.current.scale, {
+        x: gesture.startPosition.x + deltaX * frameScaleX,
+        y: gesture.startPosition.y + deltaY * frameScaleY,
+      });
+
+      scheduleTransform({
+        scale: transformRef.current.scale,
+        position: nextPosition,
+      });
+      return;
+    }
+
+    const [firstPointerId, secondPointerId] = gesture.pointerIds;
+    const firstPointer = activePointersRef.current.get(firstPointerId);
+    const secondPointer = activePointersRef.current.get(secondPointerId);
+
+    if (!firstPointer || !secondPointer) {
+      return;
+    }
+
+    const nextScale = clamp(
+      gesture.startScale *
+        (Math.hypot(
+          secondPointer.clientX - firstPointer.clientX,
+          secondPointer.clientY - firstPointer.clientY,
+        ) / gesture.startDistance),
+      scaleBounds.min,
+      scaleBounds.max,
+    );
+    const midpoint = {
+      clientX: (firstPointer.clientX + secondPointer.clientX) / 2,
+      clientY: (firstPointer.clientY + secondPointer.clientY) / 2,
+    };
+    const nextPosition = getBoundedPosition(
+      imageMetrics,
+      template.frame,
+      nextScale,
+      getPositionWithAnchor(
+        gesture.startPosition,
+        gesture.startScale,
+        nextScale,
+        template.frame,
+        gesture.startAnchor,
+        getFramePoint(midpoint, gesture),
+      ),
+    );
+
+    scheduleTransform({
+      scale: nextScale,
+      position: nextPosition,
+    });
   }
 
   function handlePointerUp(event: ReactPointerEvent<HTMLDivElement>) {
-    if (dragStartRef.current?.pointerId === event.pointerId) {
-      dragStartRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
     }
 
-    setDragging(false);
+    activePointersRef.current.delete(event.pointerId);
+    if (activePointersRef.current.size === 0) {
+      gestureRef.current = null;
+      setDragging(false);
+      applyTransformImmediate(transformRef.current);
+      return;
+    }
+
+    rebaseGesture(event.currentTarget);
   }
 
   function applyScale(nextScale: number) {
@@ -299,8 +608,15 @@ export function useWallpaperEditor() {
       return;
     }
 
-    setScale(nextScale);
-    setPosition((current) => getBoundedPosition(imageMetrics, template.frame, nextScale, current));
+    applyTransformImmediate({
+      scale: nextScale,
+      position: getBoundedPosition(
+        imageMetrics,
+        template.frame,
+        nextScale,
+        transformRef.current.position,
+      ),
+    }, true);
   }
 
   function handleScaleNudge(direction: 1 | -1) {
@@ -308,7 +624,10 @@ export function useWallpaperEditor() {
   }
 
   function handleRecenter() {
-    setPosition({ x: 0, y: 0 });
+    applyTransformImmediate({
+      scale: transformRef.current.scale,
+      position: { x: 0, y: 0 },
+    }, true);
   }
 
   async function handleExport() {
@@ -382,7 +701,7 @@ export function useWallpaperEditor() {
     frameBoxStyle,
     frameBorderRadius,
     previewBorderRadius,
-    renderedImageStyle,
+    imageViewportStyle,
     fileInputRef,
     previewViewportRef,
     fineTuneViewportRef,
