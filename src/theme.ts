@@ -12,8 +12,8 @@ const config = defineConfig({
         },
         panelFloat: {
           value: {
-            _light: 'rgba(255, 255, 255, 0.82)',
-            _dark: 'rgba(18, 20, 24, 0.82)',
+            _light: 'rgba(255, 255, 255, 0.90)',
+            _dark: 'rgba(8, 8, 8, 0.90)',
           },
         },
       },
@@ -37,8 +37,8 @@ const config = defineConfig({
         },
         floating: {
           value: {
-            _light: '0 16px 40px rgba(15, 23, 42, 0.12), 0 1px 0 rgba(15, 23, 42, 0.04)',
-            _dark: '0 24px 56px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+            _light: '0 18px 40px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.78)',
+            _dark: '0 24px 56px rgba(0, 0, 0, 0.52), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
           },
         },
         stage: {
@@ -128,7 +128,7 @@ const config = defineConfig({
       transitionDuration: '180ms',
       _osDark: {
         color: '#f4f4f5',
-        background: '#0d0f13',
+        background: '#080808',
       },
     },
   },
