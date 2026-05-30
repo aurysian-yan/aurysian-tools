@@ -46,6 +46,29 @@ export const layoutTemplates: LayoutTemplate[] = [
       radius: 103,
     },
   },
+  {
+    id: 'lumetrace-p65',
+    watchface: {
+      name: '拾光成影',
+      previewKey: 'lumetrace',
+    },
+    deviceKey: 'p65',
+    canvas: {
+      width: 432,
+      height: 514,
+      background: '#F3F3F3',
+    },
+    frame: {
+      x: 56,
+      y: 0,
+      width: 320,
+      height: 290,
+      radius: 0,
+    },
+    preview: {
+      radius: 103,
+    },
+  },
 ];
 
 export const defaultTemplate = layoutTemplates[0];
