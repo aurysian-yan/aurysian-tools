@@ -11,6 +11,9 @@ importers:
       '@chakra-ui/react':
         specifier: ^3.34.0
         version: 3.34.0(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@claralight-design/wallpaper-engine':
+        specifier: ^0.1.2
+        version: 0.1.2(react@19.2.5)
       '@emotion/react':
         specifier: ^11.14.0
         version: 11.14.0(@types/react@19.2.14)(react@19.2.5)
@@ -105,6 +108,14 @@ packages:
       '@emotion/react': '>=11'
       react: '>=18'
       react-dom: '>=18'
+
+  '@claralight-design/wallpaper-engine@0.1.2':
+    resolution: {integrity: sha512-GKLSW90pCLylmeBrB0acMPtJv4tPvDaiZBqhMhBeWgFyNJsmRCJnS1VJF0I7TyUZpEMNU/9LP2RbcBjY0jJ9vw==}
+    peerDependencies:
+      react: '>=18 <20'
+    peerDependenciesMeta:
+      react:
+        optional: true
 
   '@emnapi/core@1.10.0':
     resolution: {integrity: sha512-yq6OkJ4p82CAfPl0u9mQebQHKPJkY7WrIuk205cTYnYe+k2Z8YBh11FrbRG/H6ihirqcacOgl2BIO8oyMQLeXw==}
@@ -885,6 +896,10 @@ snapshots:
       csstype: 3.2.3
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
+
+  '@claralight-design/wallpaper-engine@0.1.2(react@19.2.5)':
+    optionalDependencies:
+      react: 19.2.5
 
   '@emnapi/core@1.10.0':
     dependencies:

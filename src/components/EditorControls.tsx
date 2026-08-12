@@ -1,7 +1,6 @@
 import {
   Button,
   Field,
-  Grid,
   HStack,
   NativeSelect,
   Slider,
@@ -9,33 +8,30 @@ import {
 } from '@chakra-ui/react';
 import { Minus, Plus } from 'phosphor-react';
 import type { ChangeEvent } from 'react';
-import { OverlayAssetHint, ScaleSectionHeader } from './AppText';
-import type { ImageMetrics, SelectOption } from '../wallpaperEditor';
+import { blendModeOptions, type ImageMetrics, type SelectOption } from '../wallpaperEditor';
+import { ScaleSectionHeader } from './AppText';
 
-type TemplateSelectorFieldsProps = {
-  watchfaceValue: string;
+type DeviceSelectorFieldProps = {
   deviceValue: string;
-  watchfaceOptions: SelectOption[];
   deviceOptions: SelectOption[];
-  onWatchfaceChange: (event: ChangeEvent<HTMLSelectElement>) => void;
   onDeviceChange: (event: ChangeEvent<HTMLSelectElement>) => void;
-  layout: 'grid' | 'stack';
 };
 
 type PreviewAdjustmentContentProps = {
   scale: number;
   scaleBounds: { min: number; max: number };
   imageMetrics: ImageMetrics | null;
-  previewOverlaySrc: string | null;
-  showFrameOverlay: boolean;
-  showFineTuneButton: boolean;
-  previewAssetPath: string;
+  imageBlur: number;
+  imageBlurBounds: { min: number; max: number; step: number };
+  glassBlendMode: string;
+  borderBlendMode: string;
   onScaleChange: (nextValue: number) => void;
   onScaleDown: () => void;
   onRecenter: () => void;
   onScaleUp: () => void;
-  onOpenFineTune: () => void;
-  onToggleOverlay: () => void;
+  onImageBlurChange: (value: number) => void;
+  onGlassBlendModeChange: (value: string) => void;
+  onBorderBlendModeChange: (value: string) => void;
 };
 
 function ScaleControlRow({
@@ -88,152 +84,126 @@ function ScaleControlRow({
   );
 }
 
-function PreviewActionRow({
-  imageMetrics,
-  previewOverlaySrc,
-  showFrameOverlay,
-  showFineTuneButton,
-  onOpenFineTune,
-  onToggleOverlay,
-}: Pick<
-  PreviewAdjustmentContentProps,
-  | 'imageMetrics'
-  | 'previewOverlaySrc'
-  | 'showFrameOverlay'
-  | 'showFineTuneButton'
-  | 'onOpenFineTune'
-  | 'onToggleOverlay'
->) {
-  return (
-    <Grid templateColumns={showFineTuneButton ? 'repeat(2, minmax(0, 1fr))' : '1fr'} gap={3}>
-      {showFineTuneButton ? (
-        <Button
-          size="lg"
-          colorPalette="gray"
-          variant="subtle"
-          onClick={onOpenFineTune}
-          disabled={!imageMetrics}
-        >
-          放大微调
-        </Button>
-      ) : null}
-      <Button
-        size="lg"
-        variant={showFrameOverlay ? 'solid' : 'outline'}
-        colorPalette="gray"
-        disabled={!previewOverlaySrc}
-        onClick={onToggleOverlay}
-      >
-        {showFrameOverlay ? '隐藏表盘预览图' : '叠加表盘预览图'}
-      </Button>
-    </Grid>
-  );
-}
-
-export function TemplateSelectorFields({
-  watchfaceValue,
+export function DeviceSelectorField({
   deviceValue,
-  watchfaceOptions,
   deviceOptions,
-  onWatchfaceChange,
   onDeviceChange,
-  layout,
-}: TemplateSelectorFieldsProps) {
-  const fieldContent = (
-    <>
-      <Field.Root>
-        <Field.Label>表盘</Field.Label>
-        <NativeSelect.Root size="lg">
-          <NativeSelect.Field value={watchfaceValue} onChange={onWatchfaceChange}>
-            {watchfaceOptions.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </NativeSelect.Field>
-          <NativeSelect.Indicator />
-        </NativeSelect.Root>
-      </Field.Root>
-      <Field.Root>
-        <Field.Label>设备</Field.Label>
-        <NativeSelect.Root size="lg">
-          <NativeSelect.Field value={deviceValue} onChange={onDeviceChange}>
-            {deviceOptions.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </NativeSelect.Field>
-          <NativeSelect.Indicator />
-        </NativeSelect.Root>
-      </Field.Root>
-    </>
+}: DeviceSelectorFieldProps) {
+  return (
+    <Field.Root>
+      <Field.Label>设备</Field.Label>
+      <NativeSelect.Root size="lg">
+        <NativeSelect.Field value={deviceValue} onChange={onDeviceChange}>
+          {deviceOptions.map((item) => (
+            <option key={item.value} value={item.value}>
+              {item.label}
+            </option>
+          ))}
+        </NativeSelect.Field>
+        <NativeSelect.Indicator />
+      </NativeSelect.Root>
+    </Field.Root>
   );
-
-  if (layout === 'grid') {
-    return (
-      <Grid templateColumns={{ base: '1fr', md: '1fr 1fr' }} gap={{ base: 4, md: 5 }} alignItems="end">
-        {fieldContent}
-      </Grid>
-    );
-  }
-
-  return <Stack gap={4}>{fieldContent}</Stack>;
 }
 
 export function PreviewAdjustmentContent({
   scale,
   scaleBounds,
   imageMetrics,
-  previewOverlaySrc,
-  showFrameOverlay,
-  showFineTuneButton,
-  previewAssetPath,
+  imageBlur,
+  imageBlurBounds,
+  glassBlendMode,
+  borderBlendMode,
   onScaleChange,
   onScaleDown,
   onRecenter,
   onScaleUp,
-  onOpenFineTune,
-  onToggleOverlay,
+  onImageBlurChange,
+  onGlassBlendModeChange,
+  onBorderBlendModeChange,
 }: PreviewAdjustmentContentProps) {
   return (
-    <Stack gap={4}>
-      <ScaleSectionHeader scale={scale} />
+    <Stack gap={5}>
+      <Stack gap={4}>
+        <ScaleSectionHeader scale={scale} />
+        <Slider.Root
+          size="lg"
+          value={[scale]}
+          min={scaleBounds.min}
+          max={scaleBounds.max}
+          step={0.01}
+          disabled={!imageMetrics}
+          onValueChange={(details) => onScaleChange(details.value[0] ?? scale)}
+        >
+          <Slider.Control>
+            <Slider.Track>
+              <Slider.Range />
+            </Slider.Track>
+            <Slider.Thumbs />
+          </Slider.Control>
+        </Slider.Root>
+        <ScaleControlRow
+          imageMetrics={imageMetrics}
+          onScaleDown={onScaleDown}
+          onRecenter={onRecenter}
+          onScaleUp={onScaleUp}
+        />
+      </Stack>
 
-      <Slider.Root
-        size="lg"
-        value={[scale]}
-        min={scaleBounds.min}
-        max={scaleBounds.max}
-        step={0.01}
-        disabled={!imageMetrics}
-        onValueChange={(details) => onScaleChange(details.value[0] ?? scale)}
-      >
-        <Slider.Control>
-          <Slider.Track>
-            <Slider.Range />
-          </Slider.Track>
-          <Slider.Thumbs />
-        </Slider.Control>
-      </Slider.Root>
+      <Field.Root disabled={!imageMetrics}>
+        <Field.Label>模糊度 · {imageBlur}px</Field.Label>
+        <Slider.Root
+          size="lg"
+          w="full"
+          value={[imageBlur]}
+          min={imageBlurBounds.min}
+          max={imageBlurBounds.max}
+          step={imageBlurBounds.step}
+          disabled={!imageMetrics}
+          onValueChange={(details) => onImageBlurChange(details.value[0] ?? imageBlur)}
+        >
+          <Slider.Control>
+            <Slider.Track>
+              <Slider.Range />
+            </Slider.Track>
+            <Slider.Thumbs />
+          </Slider.Control>
+        </Slider.Root>
+      </Field.Root>
 
-      <ScaleControlRow
-        imageMetrics={imageMetrics}
-        onScaleDown={onScaleDown}
-        onRecenter={onRecenter}
-        onScaleUp={onScaleUp}
-      />
-      <PreviewActionRow
-        imageMetrics={imageMetrics}
-        previewOverlaySrc={previewOverlaySrc}
-        showFrameOverlay={showFrameOverlay}
-        showFineTuneButton={showFineTuneButton}
-        onOpenFineTune={onOpenFineTune}
-        onToggleOverlay={onToggleOverlay}
-      />
-      {!previewOverlaySrc ? (
-        <OverlayAssetHint fileName={previewAssetPath.replace('./preview/', '')} />
-      ) : null}
+      <Field.Root>
+        <Field.Label>玻璃层混合模式</Field.Label>
+        <NativeSelect.Root size="lg">
+          <NativeSelect.Field
+            value={glassBlendMode}
+            onChange={(event) => onGlassBlendModeChange(event.target.value)}
+          >
+            {blendModeOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
+      </Field.Root>
+
+      <Field.Root>
+        <Field.Label>分割线混合模式</Field.Label>
+        <NativeSelect.Root size="lg">
+          <NativeSelect.Field
+            value={borderBlendMode}
+            onChange={(event) => onBorderBlendModeChange(event.target.value)}
+          >
+            {blendModeOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
+      </Field.Root>
     </Stack>
   );
 }

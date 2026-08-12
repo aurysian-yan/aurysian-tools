@@ -17,11 +17,8 @@ type StagePlaceholderTextProps = {
 };
 
 type PreviewSectionHeaderProps = {
-  isDesktopLayout: boolean;
   canvasWidth: number;
   canvasHeight: number;
-  frameWidth: number;
-  frameHeight: number;
   templateLabel: string;
 };
 
@@ -43,31 +40,21 @@ export function StagePlaceholderText({ title, description }: StagePlaceholderTex
 }
 
 export function PreviewSectionHeader({
-  isDesktopLayout,
   canvasWidth,
   canvasHeight,
-  frameWidth,
-  frameHeight,
   templateLabel,
 }: PreviewSectionHeaderProps) {
-  const description = isDesktopLayout
-    ? '微调图片位置并预览效果'
-    : '微调图片位置并预览效果，双击图片以放大';
-
   return (
     <Flex justify="space-between" align="start" gap={3} wrap="wrap">
       <Stack gap={2}>
         <Heading as="h2" size="md">
           壁纸预览
         </Heading>
-        <Text color="fg.muted">{description}</Text>
+        <Text color="fg.muted">拖动图片调整位置，双指缩放图片</Text>
       </Stack>
       <HStack gap={2} wrap="wrap">
         <Badge {...badgeProps}>
           画布 {canvasWidth} × {canvasHeight}
-        </Badge>
-        <Badge {...badgeProps}>
-          窗口 {frameWidth} × {frameHeight}
         </Badge>
         <Badge {...badgeProps}>{templateLabel}</Badge>
       </HStack>

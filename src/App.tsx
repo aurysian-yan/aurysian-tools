@@ -1,21 +1,10 @@
-import { Box, Card, Container, Grid, Stack } from '@chakra-ui/react';
-import {
-  BackgroundLayers,
-  BrandMark,
-  FloatingActionBar,
-  PrivacyPanel,
-} from './components/AppChrome';
+import { WallpaperStage } from '@claralight-design/wallpaper-engine/react';
+import { Box, Card, Container, Flex, Grid, Spinner, Stack, Text } from '@chakra-ui/react';
+import { BackgroundLayers, BrandMark, FloatingActionBar, PrivacyPanel } from './components/AppChrome';
 import { PreviewSectionHeader } from './components/AppText';
-import { ComposedStage } from './components/ComposedStage';
-import { PreviewAdjustmentContent, TemplateSelectorFields } from './components/EditorControls';
-import { FineTuneDialog } from './components/FineTuneDialog';
+import { DeviceSelectorField, PreviewAdjustmentContent } from './components/EditorControls';
 import { useWallpaperEditor } from './hooks/useWallpaperEditor';
-import {
-  CONTENT_CARD_PADDING,
-  PREVIEW_CANVAS_MAX_VIEWPORT_HEIGHT,
-  PREVIEW_CANVAS_MAX_WIDTH,
-  surfaceCardProps,
-} from './wallpaperEditor';
+import { CONTENT_CARD_PADDING, surfaceCardProps } from './wallpaperEditor';
 
 type AppProps = {
   appearance: 'light' | 'dark';
@@ -23,40 +12,27 @@ type AppProps = {
 
 function App({ appearance }: AppProps) {
   const editor = useWallpaperEditor();
-
-  const previewStageProps = {
-    canvasAspectRatio: editor.canvasAspectRatio,
-    canvasBackgroundColor: editor.template.canvas.background,
-    frameBoxStyle: editor.frameBoxStyle,
-    frameBorderRadius: editor.frameBorderRadius,
-    previewBorderRadius: editor.previewBorderRadius,
-    showOverlay: editor.showFrameOverlay,
-    overlaySrc: editor.previewOverlaySrc,
-    overlayAlt: `${editor.templateLabel} preview overlay`,
-    imageUrl: editor.imageUrl,
-    imageMetrics: editor.imageMetrics,
-    imageViewportStyle: editor.imageViewportStyle,
-    dragging: editor.dragging,
-    onPointerDown: editor.handlePointerDown,
-    onPointerMove: editor.handlePointerMove,
-    onPointerUp: editor.handlePointerUp,
-  };
-
-  const previewAdjustmentProps = {
+  const adjustmentProps = {
     scale: editor.scale,
     scaleBounds: editor.scaleBounds,
     imageMetrics: editor.imageMetrics,
-    previewOverlaySrc: editor.previewOverlaySrc,
-    showFrameOverlay: editor.showFrameOverlay,
-    showFineTuneButton: !editor.isDesktopLayout,
-    previewAssetPath: editor.previewAssetPath,
+    imageBlur: editor.imageBlur,
+    imageBlurBounds: editor.imageBlurBounds,
+    glassBlendMode: editor.glassBlendMode,
+    borderBlendMode: editor.borderBlendMode,
     onScaleChange: editor.applyScale,
     onScaleDown: () => editor.handleScaleNudge(-1),
     onRecenter: editor.handleRecenter,
     onScaleUp: () => editor.handleScaleNudge(1),
-    onOpenFineTune: editor.openFineTune,
-    onToggleOverlay: editor.toggleFrameOverlay,
+    onImageBlurChange: editor.setImageBlur,
+    onGlassBlendModeChange: editor.setGlassBlendMode,
+    onBorderBlendModeChange: editor.setBorderBlendMode,
   };
+  const statusMessage = editor.resourceError
+    ? '表盘资源加载失败，请刷新页面后重试。'
+    : editor.previewError
+      ? '壁纸预览失败，请重新导入图片。'
+      : editor.actionMessage;
 
   return (
     <>
@@ -76,47 +52,86 @@ function App({ appearance }: AppProps) {
           <Stack gap={{ base: 4, md: 6 }}>
             <BrandMark />
 
-            <Card.Root {...surfaceCardProps} borderRadius="panel" display={{ base: 'block', xl: 'none' }}>
+            <Card.Root
+              {...surfaceCardProps}
+              borderRadius="panel"
+              display={{ base: 'block', xl: 'none' }}
+            >
               <Card.Body p={CONTENT_CARD_PADDING}>
-                <TemplateSelectorFields
-                  layout="grid"
-                  watchfaceValue={editor.template.watchface.previewKey}
+                <DeviceSelectorField
                   deviceValue={editor.template.deviceKey}
-                  watchfaceOptions={editor.watchfaceOptions}
                   deviceOptions={editor.deviceOptions}
-                  onWatchfaceChange={editor.handleWatchfaceChange}
                   onDeviceChange={editor.handleDeviceChange}
                 />
               </Card.Body>
             </Card.Root>
 
             <Grid
-              templateColumns={{ base: '1fr', xl: 'minmax(0, 1.35fr) minmax(300px, 360px)' }}
+              templateColumns={{
+                base: '1fr',
+                xl: 'minmax(0, 1.35fr) minmax(300px, 360px)',
+              }}
               gap={{ base: 4, md: 6 }}
             >
               <Card.Root {...surfaceCardProps} borderRadius="panel">
                 <Card.Body p={CONTENT_CARD_PADDING}>
                   <Stack gap={5}>
                     <PreviewSectionHeader
-                      isDesktopLayout={editor.isDesktopLayout}
                       canvasWidth={editor.template.canvas.width}
                       canvasHeight={editor.template.canvas.height}
-                      frameWidth={editor.template.frame.width}
-                      frameHeight={editor.template.frame.height}
                       templateLabel={editor.templateLabel}
                     />
 
-                    <ComposedStage
-                      {...previewStageProps}
-                      viewportRef={editor.previewViewportRef}
-                      onDoubleClick={
-                        editor.imageMetrics && !editor.isDesktopLayout
-                          ? editor.openFineTune
-                          : undefined
-                      }
-                      placeholderTitle="请先导入图片"
-                      maxWidth={`min(100%, ${PREVIEW_CANVAS_MAX_WIDTH}px, calc(${PREVIEW_CANVAS_MAX_VIEWPORT_HEIGHT} * ${editor.canvasAspectRatio}))`}
-                    />
+                    {statusMessage ? (
+                      <Text color="fg.error" role="alert">
+                        {statusMessage}
+                      </Text>
+                    ) : null}
+
+                    <Flex
+                      minH={{ base: '360px', md: '520px' }}
+                      align="center"
+                      justify="center"
+                    >
+                      {editor.resourcesReady ? (
+                        <Box position="relative" w="full">
+                          <WallpaperStage
+                            template={editor.template}
+                            editorState={editor.editorState}
+                            inputImage={editor.inputImage ?? undefined}
+                            resources={editor.resources}
+                            onTransformChange={editor.handleTransformChange}
+                            onRenderError={editor.handleRenderError}
+                          />
+
+                          {!editor.inputImage ? (
+                            <Flex
+                              position="absolute"
+                              inset="0"
+                              align="center"
+                              justify="center"
+                              pointerEvents="none"
+                            >
+                              <Text
+                                bg="bg.panel"
+                                color="fg.muted"
+                                px={4}
+                                py={2}
+                                borderRadius="full"
+                                fontWeight="600"
+                              >
+                                请先导入图片
+                              </Text>
+                            </Flex>
+                          ) : null}
+                        </Box>
+                      ) : editor.resourceError ? null : (
+                        <Stack align="center" gap={3} color="fg.muted">
+                          <Spinner />
+                          <Text>正在加载表盘资源</Text>
+                        </Stack>
+                      )}
+                    </Flex>
 
                     <Card.Root
                       {...surfaceCardProps}
@@ -128,7 +143,7 @@ function App({ appearance }: AppProps) {
                       boxShadow={{ base: 'none', md: surfaceCardProps.boxShadow }}
                     >
                       <Card.Body p={{ base: 0, md: CONTENT_CARD_PADDING.md }}>
-                        <PreviewAdjustmentContent {...previewAdjustmentProps} />
+                        <PreviewAdjustmentContent {...adjustmentProps} />
                       </Card.Body>
                     </Card.Root>
                   </Stack>
@@ -136,15 +151,15 @@ function App({ appearance }: AppProps) {
               </Card.Root>
 
               <Stack gap={{ base: 4, md: 6 }}>
-                <Card.Root {...surfaceCardProps} borderRadius="panel" display={{ base: 'none', xl: 'block' }}>
+                <Card.Root
+                  {...surfaceCardProps}
+                  borderRadius="panel"
+                  display={{ base: 'none', xl: 'block' }}
+                >
                   <Card.Body p={CONTENT_CARD_PADDING}>
-                    <TemplateSelectorFields
-                      layout="stack"
-                      watchfaceValue={editor.template.watchface.previewKey}
+                    <DeviceSelectorField
                       deviceValue={editor.template.deviceKey}
-                      watchfaceOptions={editor.watchfaceOptions}
                       deviceOptions={editor.deviceOptions}
-                      onWatchfaceChange={editor.handleWatchfaceChange}
                       onDeviceChange={editor.handleDeviceChange}
                     />
                   </Card.Body>
@@ -156,7 +171,7 @@ function App({ appearance }: AppProps) {
                   display={{ base: 'none', xl: 'block' }}
                 >
                   <Card.Body p={CONTENT_CARD_PADDING}>
-                    <PreviewAdjustmentContent {...previewAdjustmentProps} />
+                    <PreviewAdjustmentContent {...adjustmentProps} />
                   </Card.Body>
                 </Card.Root>
               </Stack>
@@ -172,24 +187,6 @@ function App({ appearance }: AppProps) {
         fileInputRef={editor.fileInputRef}
         onFileChange={editor.handleFileChange}
         onExport={editor.handleExport}
-      />
-
-      <FineTuneDialog
-        appearance={appearance}
-        open={!editor.isDesktopLayout && editor.isFineTuneOpen}
-        onOpenChange={editor.setFineTuneOpen}
-        onClose={editor.closeFineTune}
-        stageProps={{
-          ...previewStageProps,
-          viewportRef: editor.fineTuneViewportRef,
-        }}
-        scale={editor.scale}
-        scaleBounds={editor.scaleBounds}
-        imageMetrics={editor.imageMetrics}
-        onScaleChange={editor.applyScale}
-        onScaleDown={() => editor.handleScaleNudge(-1)}
-        onRecenter={editor.handleRecenter}
-        onScaleUp={() => editor.handleScaleNudge(1)}
       />
     </>
   );

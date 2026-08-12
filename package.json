@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@chakra-ui/react": "^3.34.0",
+    "@claralight-design/wallpaper-engine": "^0.1.2",
     "@emotion/react": "^11.14.0",
     "hyperos-bg": "^0.1.1",
     "phosphor-react": "^1.4.1",

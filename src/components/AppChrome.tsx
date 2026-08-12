@@ -108,14 +108,13 @@ export function PrivacyPanel() {
 
           <Flex justify="flex-start">
             <Button
-              as="a"
-              href={GITHUB_REPO_URL}
-              target="_blank"
-              rel="noreferrer"
+              asChild
               variant="outline"
               borderRadius="full"
             >
-              查看 GitHub 仓库
+              <a href={GITHUB_REPO_URL} target="_blank" rel="noreferrer">
+                查看 GitHub 仓库
+              </a>
             </Button>
           </Flex>
         </Stack>
